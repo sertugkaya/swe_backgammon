@@ -1,3 +1,5 @@
+import json
+
 __author__ = 'sertug'
 
 import socket
@@ -15,7 +17,8 @@ class Client:
 
     def connect(self):
         self.__clientsocket = socket.socket()
-        self.__serverAddress = socket.gethostname()
+        #self.__serverAddress = socket.gethostname()
+        self.__serverAddress = "localhost"
         self.__clientsocket.connect((self.__serverAddress, self.__serverPort))
         print("Connected....")
 
@@ -23,9 +26,12 @@ class Client:
         self.__clientsocket.close()
 
     def sendrequest(self, request):
-        self.__clientsocket.send(request + "\n")
+        self.__clientsocket.send(request)
         response = self.__clientsocket.recv(self.__bufferSize)
         print(response)
+        response = json.loads(response)
+        print "unjson", (response)
+        print "header", response.get('header')
         return response
 
 
@@ -36,7 +42,11 @@ if __name__ == "__main__":
     request = ""
     while request != "QUI":
         request = raw_input('>')
-        response = clientObj.sendrequest(request)
+        userCode = request[0:6]
+        userData = request[7:]
+        data = {'code': userCode, 'username': userData}
+        print json.dumps(data)
+        response = clientObj.sendrequest(json.dumps(data))
 
     clientObj.disconnect()
     print "Client closed!"

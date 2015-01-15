@@ -1,3 +1,5 @@
+import Queue
+
 __author__ = 'sertug'
 
 import socket
@@ -8,11 +10,12 @@ import threading
 
 class ClientThread(threading.Thread):
     """Client handling unit for server class"""
-    def __init__(self, clientsocket, clientaddress):
+    def __init__(self, clientsocket, clientaddress, name_queue):
         threading.Thread.__init__(self)
         assert isinstance(clientsocket, socket.socket)
         self.clientSocket = clientsocket
         self.clientAddress = clientaddress
+        self.nameQueue = name_queue
 
     def __del__(self):
         self.clientSocket.close()
@@ -31,7 +34,11 @@ class ClientThread(threading.Thread):
             response = json.dumps(data)
         elif request.get('code') == "CCNREQ":
             username = request.get('username')
-            response = {'header': 'SRVROK', 'username': username, 'message': 'Welcome to TavlaHero, please choose to be a player to play backgammon or choose to be a guest to watch a game live.'}
+            if username == self.nameQueue.get(username):
+                response = {'header': 'SRVERR', 'username': username, 'message': 'Please pick a different username.'}
+            else:
+                self.nameQueue.put(username)
+                response = {'header': 'SRVROK', 'username': username, 'message': 'Welcome to TavlaHero, please choose to be a player to play backgammon or choose to be a guest to watch a game live.'}
         elif request.get('code') == "CHBEAT":
             username = request.get('username')
             response = {'header': 'SRVROK', 'username': username}
@@ -53,10 +60,11 @@ class Server(threading.Thread):
     __definitions = {}
     __exitFlag = 0
 
-    def __init__(self):
+    def __init__(self, name_queue):
         threading.Thread.__init__(self)
         self.__serverPort = 12345
         self.__bufferSize = 1024
+        self.__namequeue = name_queue
 
     def start(self):
         self.__serverSocket = socket.socket()
@@ -69,7 +77,7 @@ class Server(threading.Thread):
         while not Server.__exitFlag:
             clientsocket, clientaddress = self.__serverSocket.accept()
             if not Server.__exitFlag:
-                client_thread = ClientThread(clientsocket, clientaddress)
+                client_thread = ClientThread(clientsocket, clientaddress, self.__namequeue)
                 client_thread.start()
 
         clientsocket.close()
@@ -77,7 +85,8 @@ class Server(threading.Thread):
 
 
 if __name__ == "__main__":
-    serverObj = Server()
+    q = Queue.Queue(10)
+    serverObj = Server(q)
     serverObj.start()
 
 

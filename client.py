@@ -5,7 +5,7 @@ __author__ = 'sertug'
 import socket
 import threading
 import time
-
+import server
 
 class Client:
     __serverAddress = ""
@@ -16,8 +16,8 @@ class Client:
     __canheartbeat = False
 
     def __init__(self):
-        self.__serverPort = 12345
-        self.__bufferSize = 1024
+        self.__serverPort = server.SERVER_PORT
+        self.__bufferSize = server.BUFFER_SIZE
 
     def connect(self):
         self.__clientsocket = socket.socket()
@@ -47,7 +47,7 @@ class HeartBeatThread(threading.Thread):
         threading.Thread.__init__(self)
         self.__clientsocket = socket.socket()
         self.__serverAddress = socket.gethostname()
-        self.__serverPort = 54321
+        self.__serverPort = server.SERVER_PORT
 
     def __del__(self):
         self.__clientsocket.close()

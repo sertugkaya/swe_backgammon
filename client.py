@@ -7,6 +7,32 @@ import server
 
 CLIENT_PORT = 54321
 
+class HeartBeatThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.__clientsocket = socket.socket()
+        self.__serverAddress = socket.gethostname()
+        self.__serverPort = server.SERVER_PORT
+
+    def __del__(self):
+        self.__clientsocket.close()
+
+    def connect(self):
+        self.__clientsocket.connect((self.__serverAddress, self.__serverPort))
+        print("internal client connected....")
+
+    def send(self, data):
+        print "internal sending"
+        self.__clientsocket.send(data)
+
+    def run(self):
+        self.connect()
+        while True:
+            print "heartbeat sending"
+            data = {'code': 'CHBEAT', 'username': self.__username}
+            self.__clientsocket.send(json.dumps(data))
+            time.sleep(5)
+
 class ReceiverThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
@@ -44,7 +70,7 @@ class Client(threading.Thread):
         self.__bufferSize = server.BUFFER_SIZE
         self.__clientsocket = socket.socket()
         self.__serverAddress = socket.gethostname()
-        self.__receiverThread = ReceiverThread()
+        #self.__receiverThread = ReceiverThread()
 
     def __del__(self):
         self.__clientsocket.close()
@@ -52,12 +78,12 @@ class Client(threading.Thread):
     def run(self):
         self.__clientsocket.connect(('', self.__serverPort))
         print("Connected....")
-        self.__receiverThread.start()
+        #self.__receiverThread.start()
         while not Client.__exitFlag:
             userinput = self.getInput()
             request = self.parseinput(userinput)
             response = self.sendrequest(request)
-        print response
+            print response
 
     def getInput(self):
         return raw_input(">")
@@ -67,7 +93,7 @@ class Client(threading.Thread):
 
     def sendrequest(self, request):
         self.__clientsocket.send(request)
-        response = self.__receiverThread.recv()
+        response = self.__clientsocket.recv(1024)
         response = json.loads(response)
         return response
 
@@ -90,32 +116,6 @@ class Client(threading.Thread):
             self.__clientsocket.send(json.dumps(data))
             time.sleep(5)
 
-class HeartBeatThread(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.__clientsocket = socket.socket()
-        self.__serverAddress = socket.gethostname()
-        self.__serverPort = server.SERVER_PORT
-
-    def __del__(self):
-        self.__clientsocket.close()
-
-    def connect(self):
-        self.__clientsocket.connect((self.__serverAddress, self.__serverPort))
-        print("internal client connected....")
-
-    def send(self, data):
-        print "internal sending"
-        self.__clientsocket.send(data)
-
-    def run(self):
-        self.connect()
-        while True:
-            print "heartbeat sending"
-            data = {'code': 'CHBEAT', 'username': self.__username}
-            self.__clientsocket.send(json.dumps(data))
-            time.sleep(5)
-
 
 if __name__ == "__main__":
     clientObj = Client()
@@ -123,7 +123,6 @@ if __name__ == "__main__":
     #threading.Timer(2.0, clientObj.heartbeat()).start()
 
 
-    #clientObj.disconnect()
     clientObj.join()
     print "Client closed!"
 

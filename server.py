@@ -8,7 +8,7 @@ import threading
 SERVER_PORT = 12345
 BUFFER_SIZE = 1024
 
-
+"""
 class ClientResponseThread(threading.Thread):
     def __init__(self, clientSocket, clientAddress):
         self.clientSocket = clientSocket
@@ -19,10 +19,10 @@ class ClientResponseThread(threading.Thread):
     def send(self, data):
         print "response sending"
         self.clientSocket.send(json.dumps(data))
-
+"""
 class ClientThread(threading.Thread):
     """Client handling unit for server class"""
-    def __init__(self, clientsocket, clientaddress, nameLock, nameList, playerList):
+    def __init__(self, clientsocket, clientaddress, nameLock, nameList, playerList, gameList):
         threading.Thread.__init__(self)
         assert isinstance(clientsocket, socket.socket)
         self.clientSocket = clientsocket
@@ -30,18 +30,19 @@ class ClientThread(threading.Thread):
         self.nameLock = nameLock
         self.nameList = nameList
         self.playerList = playerList
-        self.responseThread = ClientResponseThread(self.clientSocket, self.clientAddress)
+        self.gameList = gameList
 
     def __del__(self):
         self.clientSocket.close()
 
     def run(self):
         while True:
+            response = {'': ''}
             request = self.clientSocket.recv(BUFFER_SIZE)
             print "request arrived:" + request
             response = self.parser(request)
-            #self.clientSocket.send(json.dumps(response))
-            self.responseThread.send(response)
+            self.clientSocket.send(json.dumps(response))
+            #self.responseThread.send(response)
 
     def parser(self, request):
         request = json.loads(request)
@@ -56,7 +57,7 @@ class ClientThread(threading.Thread):
                 self.nameLock.acquire()
                 self.nameList.append(username)
                 self.nameLock.release()
-                print "nameList",nameList
+                print "nameList", nameList
                 response = {'header': 'SRVROK',
                             'username': username,
                             'message': 'Welcome to TavlaHero, please choose to be a player to play backgammon or choose to be a guest to watch a game live.'}
@@ -65,12 +66,16 @@ class ClientThread(threading.Thread):
             response = {'header': 'SRVROK', 'username': username}
         elif request.get('code') == "CPLREQ":
             username = request.get('username')
-            if self.nameList.count(username) ==1:
-                playerList.append(username)
-                if playerList.__len__() == 1:
+            if self.nameList.count(username) == 1:
+                clientData = (username, self.clientSocket, self.clientAddress)
+                self.playerList.append(clientData)
+                if self.playerList.__len__() == 1:
                     response = {'header': 'SRWAIT',
                                 'message': 'There are no active users, please request to play again shortly.'}
-                elif playerList.__len__() >= 2:
+                elif self.playerList.__len__() % 2 == 0 and self.playerList.__len__() != 0:
+                    self.gameList.append(playerList[0])
+                    self.gameList.append(playerList[1])
+                    self.playerList = [] #empty the waitlist
                     response = {'header': 'SRVROK',
                                 'message': 'Game starts'}
             else:
@@ -79,14 +84,13 @@ class ClientThread(threading.Thread):
             username = request.get('username')
             response = {'header': 'SRVROK', 'username': username}
         else:
-            data = {'header': 'SRVERR', 'message': 'error'}
-            response = json.dumps(data)
+            response = {'header': 'SRVERR', 'message': 'error'}
         return response
 
 class Server(threading.Thread):
     __exitFlag = 0
 
-    def __init__(self, nameLock, nameList, playerList):
+    def __init__(self, nameLock, nameList, playerList, gameList):
         threading.Thread.__init__(self)
         self.__serverPort = SERVER_PORT
         self.__bufferSize = BUFFER_SIZE
@@ -95,6 +99,7 @@ class Server(threading.Thread):
         self.__nameLock = nameLock
         self.__nameList = nameList
         self.__playerList = playerList
+        self.__gameList = gameList
 
     def run(self):
         self.__serverSocket.bind(('', self.__serverPort))
@@ -103,7 +108,7 @@ class Server(threading.Thread):
         while not Server.__exitFlag:
             clientsocket, clientaddress = self.__serverSocket.accept()
             if not Server.__exitFlag:
-                client_thread = ClientThread(clientsocket, clientaddress, self.__nameLock, self.__nameList, self.__playerList)
+                client_thread = ClientThread(clientsocket, clientaddress, self.__nameLock, self.__nameList, self.__playerList, self.__gameList)
                 client_thread.start()
 
         print"Server is closing!"
@@ -116,7 +121,8 @@ if __name__ == "__main__":
     nameLock = threading.Lock()
     nameList = []
     playerList = []
-    serverObj = Server(nameLock, nameList, playerList)
+    gameList = []
+    serverObj = Server(nameLock, nameList, playerList, gameList)
     serverObj.start()
 
     serverObj.join()

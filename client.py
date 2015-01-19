@@ -5,14 +5,14 @@ import threading
 import time
 import server
 
-CLIENT_PORT = 54321
 
 class HeartBeatThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, username):
         threading.Thread.__init__(self)
         self.__clientsocket = socket.socket()
         self.__serverAddress = socket.gethostname()
         self.__serverPort = server.SERVER_PORT
+        self.__username = username
 
     def __del__(self):
         self.__clientsocket.close()
@@ -33,34 +33,6 @@ class HeartBeatThread(threading.Thread):
             self.__clientsocket.send(json.dumps(data))
             time.sleep(5)
 
-class ReceiverThread(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.__clientPort = CLIENT_PORT
-        self.__clientsocket = socket.socket()
-        self.__clientAddress = socket.gethostname()
-        #self.__clientAddress = server.SERVER_ADDRESS
-        self.__bufferSize = server.BUFFER_SIZE
-        self.__serverSocket = None
-        self.__serverAddress = None
-        print "receiver init complete"
-        self.__clientsocket.bind(('', self.__clientPort))
-        self.__clientsocket.listen(5)
-        self.__serverSocket, self.__serverAddress = self.__clientsocket.accept()
-
-    def __del__(self):
-        self.__clientsocket.close()
-
-    def run(self):
-
-        print("receiver thread connected....")
-        while True:
-            serverData = self.__serverSocket.recv(self.__bufferSize)
-            return serverData
-
-    def recv(self):
-        return self.__clientsocket.recv(1024)
-
 class Client(threading.Thread):
     __exitFlag = 0
 
@@ -70,7 +42,7 @@ class Client(threading.Thread):
         self.__bufferSize = server.BUFFER_SIZE
         self.__clientsocket = socket.socket()
         self.__serverAddress = socket.gethostname()
-        #self.__receiverThread = ReceiverThread()
+        #self.__beatThread = HeartBeatThread(username)
 
     def __del__(self):
         self.__clientsocket.close()
@@ -78,8 +50,8 @@ class Client(threading.Thread):
     def run(self):
         self.__clientsocket.connect(('', self.__serverPort))
         print("Connected....")
-        #self.__receiverThread.start()
         while not Client.__exitFlag:
+            #self.__beatThread.run()
             userinput = self.getInput()
             request = self.parseinput(userinput)
             response = self.sendrequest(request)
@@ -101,7 +73,6 @@ class Client(threading.Thread):
         userCode = userinput[0:6]
         userData = userinput[7:]
         userDataList = userData.split()
-        print "usercode ", userCode, "userDataList ", userDataList
         data = ""
         if userCode == "CCNREQ" or userCode == "CPLREQ" or userCode == "CGUREQ" or userCode == "CWRREQ" or userCode == "CLGREQ":
             data = {'code': userCode, 'username': userDataList[0]}
@@ -109,22 +80,8 @@ class Client(threading.Thread):
             data = {'code': userCode, 'username': userDataList[0], 'move': userDataList[1]}
         return json.dumps(data)
 
-    def heartbeat(self):
-        while self.__canheartbeat:
-            print "heartbeat sending"
-            data = {'code': 'CHBEAT', 'username': self.__username}
-            self.__clientsocket.send(json.dumps(data))
-            time.sleep(5)
-
-
 if __name__ == "__main__":
     clientObj = Client()
     clientObj.start()
-    #threading.Timer(2.0, clientObj.heartbeat()).start()
-
-
     clientObj.join()
     print "Client closed!"
-
-
-#SERVERREPSONSE THREAD

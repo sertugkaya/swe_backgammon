@@ -63,6 +63,7 @@ class ClientThread(threading.Thread):
                             'message': 'Welcome to TavlaHero, please choose to be a player to play backgammon or choose to be a guest to watch a game live.'}
         elif request.get('code') == "CHBEAT":
             username = request.get('username')
+            print "heartbeat: ", username
             response = {'header': 'SRVROK', 'username': username}
         elif request.get('code') == "CPLREQ":
             username = request.get('username')
